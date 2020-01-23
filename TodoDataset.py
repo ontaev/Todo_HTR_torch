@@ -36,6 +36,4 @@ if __name__ == '__main__':
     dataloader = DataLoader(dataset, batch_size=50, shuffle=True, num_workers=2)
     for i, batch in enumerate(dataloader):
         print(i, batch)
-    #print(len(dataset))
-    #print(dataset[100])
-    #print(dataset[122:361])
+
