@@ -16,6 +16,7 @@ class TodoDataset(Dataset):
         return self.samples[idx]
     
     def _init_dataset(self):
+        """ loads file paths and labels """
 
         with open(self.file_path + "/words.txt", 'r') as input_file:
             for line in input_file:
