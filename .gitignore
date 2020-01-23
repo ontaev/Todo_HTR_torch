@@ -130,3 +130,6 @@ dmypy.json
 .vscode/settings.json
 
 .DS_Store
+# Dataset
+
+DATASET/*
