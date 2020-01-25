@@ -21,6 +21,7 @@ class TodoDataset(Dataset):
     def __getitem__(self, idx):
         """ returns element by index """
         image = cv.resize(cv.imread(self.samples[idx][0]), self.image_size)
+        image = cv.transpose(image)
         gt_text = self.samples[idx][1]
         return image, gt_text
     

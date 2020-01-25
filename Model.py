@@ -13,7 +13,7 @@ class LayersCNN(torch.nn.Module):
             raise NotImplementedError
 
         kernel_size = [5, 5, 3, 3, 3]
-        features_num = [1, 32, 64, 128, 128, 256]
+        features_num = [3, 32, 64, 128, 128, 256]
         pooling_ksize = pooling_stride = [(2,2), (2,2), (2,2), (2,1), (2,1)]
 
         self.rnn_input = features_num[-1]
@@ -86,9 +86,9 @@ class LayersCNN(torch.nn.Module):
         x = self.act4(x)
         x = self.pool4(x)
 
-        x = self.conv4(x)
-        x = self.act4(x)
-        x = self.pool4(x)
+        x = self.conv5(x)
+        x = self.act5(x)
+        x = self.pool5(x)
 
         return x
 
@@ -121,10 +121,13 @@ class Model(torch.nn.Module):
             LayersRNN(rnn_hidden, rnn_hidden, num_char))
         
     def forward(self, x):
-
+        #print(x.size())
         cnn_out = self.cnn(x)
+        cnn_out = cnn_out.squeeze(2)
+        cnn_out = cnn_out.permute(2, 0, 1)  # [w, b, c]
+        #print(cnn_out.size())
         rnn_out = self.rnn(cnn_out)
-        
+
         # add log_softmax to converge output
         output = torch.nn.functional.log_softmax(rnn_out, dim=2)
 
