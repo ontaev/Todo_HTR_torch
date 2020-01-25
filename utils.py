@@ -6,6 +6,7 @@ class LabelConverter:
         
     def to_sparse(self, texts):
         "put ground truth texts into sparse tensor for ctc_loss"
+        
         indices = []
         values = []
         shape = [len(texts), 0] 
@@ -23,6 +24,6 @@ class LabelConverter:
                 values.append(label)
         
         return (indices, values, shape)
-        
+
     def decoder_output_to_text(self, ctc_output, batch_size):
         "extract texts from output of CTC decoder"

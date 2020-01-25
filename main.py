@@ -1,6 +1,7 @@
 from torch.utils.data import DataLoader
 from TodoDataset import TodoDataset
 from utils import LabelConverter
+from Model import Model
 
 def train():
     pass
@@ -17,6 +18,10 @@ def main():
 
     dataset = TodoDataset('DATASET', (28, 196))
     dataloader = DataLoader(dataset, batch_size=2, shuffle=True, num_workers=2)
+
+    model = Model(256, len(dataset.char_set))
+
+    print(model)
     
     #for i, batch in enumerate(dataloader):
         #print(i, batch)
