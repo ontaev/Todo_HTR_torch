@@ -18,7 +18,7 @@ class LayersCNN(torch.nn.Module):
 
         self.rnn_input = features_num[-1]
 
-        self.conv1 = torch.nn.Conv2d(in_channels=features_num[0], out_channels=features_num[1], kernel_size=kernel_size[0], padding=1)
+        self.conv1 = torch.nn.Conv2d(in_channels=features_num[0], out_channels=features_num[1], kernel_size=kernel_size[0], padding=2)
         self.act1 = activation_function
         
         if pooling == 'avg':
@@ -28,7 +28,7 @@ class LayersCNN(torch.nn.Module):
         else:
             raise NotImplementedError
         
-        self.conv2 = torch.nn.Conv2d(in_channels=features_num[1], out_channels=features_num[2], kernel_size=kernel_size[1], padding=1)
+        self.conv2 = torch.nn.Conv2d(in_channels=features_num[1], out_channels=features_num[2], kernel_size=kernel_size[1], padding=2)
         self.act2 = activation_function
 
         if pooling == 'avg':
@@ -69,27 +69,27 @@ class LayersCNN(torch.nn.Module):
             raise NotImplementedError
         
     def forward(self, x):
-        
+        # input size: batch_size * channels * img_width * img_height. Example% 10x3x32x192
         x = self.conv1(x)
         x = self.act1(x)
         x = self.pool1(x)
-
+        # output size: 10x32x16x96
         x = self.conv2(x)
         x = self.act2(x)
         x = self.pool2(x)
-
+        # output size: 10x64x8x48
         x = self.conv3(x)
         x = self.act3(x)
         x = self.pool3(x)
-
+        # output size: 10x128x4x24
         x = self.conv4(x)
         x = self.act4(x)
         x = self.pool4(x)
-
+        # output size: 10x128x2x24
         x = self.conv5(x)
         x = self.act5(x)
         x = self.pool5(x)
-
+        # output size: 10x256x1x24 -> 256 features and 24 timesteps
         return x
 
 class LayersRNN(torch.nn.Module):
@@ -121,14 +121,12 @@ class Model(torch.nn.Module):
             LayersRNN(rnn_hidden, rnn_hidden, num_char))
         
     def forward(self, x):
-        #print(x.size())
-        cnn_out = self.cnn(x)
-        cnn_out = cnn_out.squeeze(2)
-        cnn_out = cnn_out.permute(2, 0, 1)  # [w, b, c]
-        #print(cnn_out.size())
-        rnn_out = self.rnn(cnn_out)
-
+        cnn_out = self.cnn(x) # cnn output size: 10x256x1x24 -> 256 features and 24 time-steps
+        cnn_out = cnn_out.squeeze(2) #remove dimension with 1 width -> 10x256x24
+        cnn_out = cnn_out.permute(2, 0, 1)  # change dimension to 24x10x256 (timesteps x batch_size x channels)
+        rnn_out = self.rnn(cnn_out) # rnn output size: 24x10x40, where 40 is charset lenght
+        
         # add log_softmax to converge output
-        output = torch.nn.functional.log_softmax(rnn_out, dim=2)
-
+        output = torch.nn.functional.log_softmax(rnn_out, dim=2) #size: 24x10x40
+        
         return output
