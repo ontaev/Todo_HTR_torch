@@ -2,7 +2,7 @@ import torch
 
 class LayersCNN(torch.nn.Module):
     """ CNN layers of net """
-    def __init__(self, activation='tanh', pooling='avg'):
+    def __init__(self, activation='relu', pooling='max'):
         super(LayersCNN, self).__init__()
 
         if activation == 'tanh':
@@ -125,7 +125,7 @@ class Model(torch.nn.Module):
         cnn_out = self.cnn(x) # cnn output size: 10x256x1x24 -> 256 features and 24 time-steps
         cnn_out = cnn_out.squeeze(2) #remove dimension with 1 width -> 10x256x24
         cnn_out = cnn_out.permute(2, 0, 1)  # change dimension to 24x10x256 (timesteps x batch_size x channels)
-        rnn_out = self.rnn(cnn_out) # rnn output size: 24x10x40, where 40 is charset lenght
+        rnn_out = self.rnn(cnn_out) # rnn output size: 24x10x41, where 40 is charset lenght + 1 blank
         
         # add log_softmax to converge output
         output = torch.nn.functional.log_softmax(rnn_out, dim=2) #size: 24x10x40
