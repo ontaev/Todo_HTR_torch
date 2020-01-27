@@ -13,7 +13,7 @@ class LayersCNN(torch.nn.Module):
             raise NotImplementedError
 
         kernel_size = [5, 5, 3, 3, 3]
-        features_num = [3, 32, 64, 128, 128, 256]
+        features_num = [1, 32, 64, 128, 128, 256]
         pooling_ksize = pooling_stride = [(2,2), (2,2), (2,2), (2,1), (2,1)]
 
         self.rnn_input = features_num[-1]
@@ -69,6 +69,7 @@ class LayersCNN(torch.nn.Module):
             raise NotImplementedError
         
     def forward(self, x):
+        x = x.unsqueeze(1)
         # input size: batch_size * channels * img_width * img_height. Example% 10x3x32x192
         x = self.conv1(x)
         x = self.act1(x)

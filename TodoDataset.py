@@ -22,14 +22,14 @@ class TodoDataset(Dataset):
     def __getitem__(self, idx):
         """ returns element by index """
 
-        image = self.preprocessor.resize_image(cv.imread(self.samples[idx][0]), self.image_size)
+        image = self.preprocessor.resize_image(cv.imread(self.samples[idx][0], cv.IMREAD_GRAYSCALE), self.image_size)
         gt_text = self.samples[idx][1]
         return image, gt_text
     
     def _init_dataset(self):
         """ loads file paths and labels """
         chars = set()
-        with open(self.file_path + "/words.txt", 'r') as input_file:
+        with open(self.file_path + "/words_small.txt", 'r') as input_file:
             for line in input_file:
                 line_split = line.strip().split('\t')
                 file_name = self.file_path+"/words/"+line_split[1]

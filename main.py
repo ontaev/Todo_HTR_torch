@@ -40,10 +40,11 @@ def train_model(model, loss, optimizer, scheduler, num_epochs, train_dataloader,
             # Iterate over data.
             for inputs, texts in tqdm(dataloader):
                 
-                inputs = inputs.permute(0, 3, 1, 2).float().to(device)
-                
+                #inputs = inputs.permute(0, 3, 1, 2).float().to(device)
+                inputs = inputs.float().to(device)
                 #print(inputs.dtype)
                 labels, lenghts = converter.encode_text(texts)
+                labels = labels.to(device)
                 batch_size = inputs.size(0)
 
                 optimizer.zero_grad()
@@ -52,7 +53,7 @@ def train_model(model, loss, optimizer, scheduler, num_epochs, train_dataloader,
                 with torch.set_grad_enabled(phase == 'train'):
                     preds = model(inputs)
                     preds_size = torch.Tensor([preds.size(0)] * batch_size)
-                    loss_value = loss(preds, labels, preds_size, lenghts)
+                    loss_value = loss(preds, labels, preds_size, lenghts) / batch_size 
 
                     # backward + optimize only if in training phase
                     if phase == 'train':
@@ -93,10 +94,9 @@ def check_accuracy(preds, gt_texts, converter):
     num_word_ok = 0
     num_word_total = 0
 
-    _, classes = preds.max(2) # Probabilities to indexes
-        #print(classes.size())
-    classes = classes.transpose(1, 0)
-    recognized = converter.decode_text(classes.data)
+    preds = preds.permute(1, 0, 2)
+    print("Preds: ", preds)
+    recognized = converter.decode_text(preds.data.cpu().numpy())
 
     print('Ground truth -> Recognized')    
     for i in range(len(recognized)):
@@ -132,17 +132,17 @@ def main():
     #val_size = len(dataset) - train_size
 
     train_set, val_set = random_split(dataset, [train_size, val_size])
-    train_dataloader = DataLoader(train_set, batch_size=100, shuffle=True, num_workers=10)
-    val_dataloader = DataLoader(val_set, batch_size=100, shuffle=True, num_workers=10)
+    train_dataloader = DataLoader(train_set, batch_size=128, shuffle=True, num_workers=10)
+    val_dataloader = DataLoader(val_set, batch_size=128, shuffle=True, num_workers=10)
 
-    model = Model(256, len(dataset.char_set))
+    model = Model(256, len(dataset.char_set) + 1)
     loss = torch.nn.CTCLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1.0e-3, amsgrad=True)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.9)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1.0e-5, amsgrad=True)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
     converter = LabelConverter(dataset.char_set)
 
-    train_model(model=model, loss=loss, optimizer=optimizer, scheduler=scheduler, num_epochs=2, 
+    train_model(model=model, loss=loss, optimizer=optimizer, scheduler=scheduler, num_epochs=100, 
                 train_dataloader=train_dataloader, val_dataloader=val_dataloader, converter=converter)
 
     #print(model)

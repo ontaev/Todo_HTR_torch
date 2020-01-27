@@ -1,6 +1,7 @@
 import torch
 import cv2 as cv
 import numpy as np
+from CTCBestPath import ctcBestPath
 
 class ImagePreprocess:
     def __init__(self):
@@ -12,15 +13,18 @@ class ImagePreprocess:
 
         # create target image and copy sample image into it
         (wt, ht) = image_size
-        (h, w, _) = image.shape
+        #(h, w, _) = image.shape - for color image case
+        (h, w) = image.shape
         fx = w / wt
         fy = h / ht
         f = max(fx, fy)
         newSize = (max(min(wt, int(w / f)), 1), max(min(ht, int(h / f)), 1)) # scale according to f (result at least 1 and at most wt or ht)
         image = cv.resize(image, newSize)
     
-        target = np.ones([ht, wt, 3]) * 255
-        target[0:newSize[1], 0:newSize[0], :] = image
+        target = np.ones([ht, wt]) * 255
+        target[0:newSize[1], 0:newSize[0]] = image
+        #target = np.ones([ht, wt, 3]) * 255
+        #target[0:newSize[1], 0:newSize[0], :] = image
         image = cv.transpose(target)
 
       
@@ -33,46 +37,42 @@ class LabelConverter:
         if ignore_case:
             char_set = char_set.lower()
         
-    def encode_text(self, texts):
+    def encode_text(self, text):
         "puts ground truth texts into tensor for ctc_loss and returns lenghts of labels"
 
-        lenghts = []
+        length = []
+        result = []
+        for item in text:            
+            #item = item.decode('utf-8','strict')
+            length.append(len(item))
+            r = []
+            for char in item:
+                index = self.char_set.index(char)
+                # result.append(index)
+                r.append(index)
+            result.append(r)
         
-        indices = []
-        values = []
-        shape = [len(texts), 0] 
+        max_len = 0
+        for r in result:
+            if len(r) > max_len:
+                max_len = len(r)
+        
+        result_temp = []
+        for r in result:
+            for _ in range(max_len - len(r)):
+                r.append(0)
+            result_temp.append(r)
 
-	    # go over all texts
-        for (batch_element, text) in enumerate(texts):
-            # convert to string of label (i.e. class-ids)
-            label_str = [self.char_set.index(c) + 1 for c in text]
-            # add lenght of text to list 
-            lenghts.append(len(label_str))
-            # sparse tensor must have size of max. label-string
-            if len(label_str) > shape[1]:
-                shape[1] = len(label_str)
-            # put each label into sparse tensor
-            for (i, label) in enumerate(label_str):
-                indices.append([batch_element, i])
-                values.append(label)
-            
-        i = torch.LongTensor(indices)
-        v = torch.LongTensor(values)
-        result = torch.sparse.LongTensor(i.t(), v, shape).to_dense()
-
-        lenghts = torch.Tensor(lenghts)
-
-        return result, lenghts
+        text = result_temp
+        return (torch.LongTensor(text), torch.LongTensor(length))
 
     def decode_text(self, encoded_text):
         "extract texts from output of CTC decoder"
+
         text = []
+        #print("Encoded size:", encoded_text.shape)
         for encoded in encoded_text:
-            char_list = []
-            for i in encoded:
-                if i != 0:
-                    char_list.append(self.char_set[i - 1])
-            text.append(''.join(char_list))
+            text.append(ctcBestPath(encoded, self.char_set))
         return text
 
 
