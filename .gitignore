@@ -133,3 +133,6 @@ dmypy.json
 # Dataset
 
 DATASET/*
+
+#Notebooks
+*.ipynb
