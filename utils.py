@@ -43,12 +43,12 @@ class LabelConverter:
         length = []
         result = []
         for item in text:            
-            #item = item.decode('utf-8','strict')
+            
             length.append(len(item))
             r = []
             for char in item:
                 index = self.char_set.index(char)
-                # result.append(index)
+                
                 r.append(index)
             result.append(r)
         
@@ -70,9 +70,7 @@ class LabelConverter:
         "extract texts from output of CTC decoder"
 
         text = []
-        #print("Encoded size:", encoded_text.shape)
+        
         for encoded in encoded_text:
             text.append(ctcBestPath(encoded, self.char_set))
         return text
-
-

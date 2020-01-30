@@ -29,7 +29,7 @@ class TodoDataset(Dataset):
     def _init_dataset(self):
         """ loads file paths and labels """
         chars = set()
-        with open(self.file_path + "/words_small.txt", 'r') as input_file:
+        with open(self.file_path + "/words.txt", 'r') as input_file:
             for line in input_file:
                 line_split = line.strip().split('\t')
                 file_name = self.file_path+"/words/"+line_split[1]
@@ -39,6 +39,4 @@ class TodoDataset(Dataset):
         input_file.close()
 
         self.char_set = sorted(list(chars))
-
-
-    
+        

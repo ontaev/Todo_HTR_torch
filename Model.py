@@ -69,7 +69,7 @@ class LayersCNN(torch.nn.Module):
             raise NotImplementedError
         
     def forward(self, x):
-        x = x.unsqueeze(1)
+        x = x.unsqueeze(1) # in case of grayscale image we must add 1 dimension for channels
         # input size: batch_size * channels * img_width * img_height. Example% 10x3x32x192
         x = self.conv1(x)
         x = self.act1(x)
@@ -128,6 +128,6 @@ class Model(torch.nn.Module):
         rnn_out = self.rnn(cnn_out) # rnn output size: 24x10x41, where 40 is charset lenght + 1 blank
         
         # add log_softmax to converge output
-        output = torch.nn.functional.log_softmax(rnn_out, dim=2) #size: 24x10x40
+        output = torch.nn.functional.log_softmax(rnn_out, dim=2) #size: 24x10x41
         
         return output
