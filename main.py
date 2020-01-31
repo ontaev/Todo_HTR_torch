@@ -215,13 +215,15 @@ def main():
 
     dataset = TodoDataset(Params.dataset_path, Params.image_size)
     converter = LabelConverter(dataset.char_set)
+
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     
     if args.train or args.validate:
 
-        train_loss = [] 
-        val_loss = [] 
-        char_error = [] 
-        word_acc = []
+        #train_loss = [] 
+        #val_loss = [] 
+        #char_error = [] 
+        #word_acc = []
         
         if args.train:
 
@@ -239,7 +241,8 @@ def main():
             optimizer = torch.optim.Adam(model.parameters(), lr=1.0e-4, amsgrad=True)
             scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
 
-            train_loss, val_loss, char_error, word_acc = train_model(model=model, loss=loss, optimizer=optimizer, scheduler=scheduler, num_epochs=70, 
+            #train_loss, val_loss, char_error, word_acc = 
+            train_model(model=model, loss=loss, optimizer=optimizer, scheduler=scheduler, num_epochs=70, 
                 train_dataloader=train_dataloader, val_dataloader=val_dataloader, converter=converter)
 
             torch.save(model.state_dict(), 'model/model.pth')
@@ -251,14 +254,15 @@ def main():
             loss = torch.nn.CTCLoss()
             
             model = Model(1024, len(dataset.char_set) + 1)
-            model.load_state_dict(torch.load('model/model.pth', map_location='cpu'))
+            model.load_state_dict(torch.load('model/model.pth', map_location=device))
 
-            val_loss, char_error_rate, word_accuracy = validate_model(model, loss, val_dataloader, converter)
+            #val_loss, char_error_rate, word_accuracy = 
+            validate_model(model, loss, val_dataloader, converter)
 
 
     else:
         model = Model(1024, len(dataset.char_set) + 1)
-        model.load_state_dict(torch.load('model/model.pth', map_location='cpu'))
+        model.load_state_dict(torch.load('model/model.pth', map_location=device))
 
         image = ImagePreprocess().resize_image(cv.imread(Params.test_image, cv.IMREAD_GRAYSCALE), Params.image_size)
         result = recognize(model, image, converter)
