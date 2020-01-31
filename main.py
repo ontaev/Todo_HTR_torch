@@ -1,19 +1,26 @@
 import torch
 from torch.utils.data import DataLoader, random_split
 import numpy as np
+import cv2 as cv
 import random
+import argparse
 from tqdm import tqdm
 import editdistance
 from TodoDataset import TodoDataset
-from utils import LabelConverter
+from utils import LabelConverter, ImagePreprocess
 from Model import Model
-
 
 random.seed(42)
 np.random.seed(42)
 torch.manual_seed(42)
 torch.cuda.manual_seed(42)
 torch.backends.cudnn.deterministic = True
+
+class Params:
+    
+    test_image = "data/test.jpg"
+    dataset_path = "DATASET/"
+    image_size = (32, 192)
 
 def train_model(model, loss, optimizer, scheduler, num_epochs, train_dataloader, val_dataloader, converter):
     
@@ -128,49 +135,136 @@ def check_accuracy(preds, gt_texts, converter, silent=True):
     return num_char_err, num_char_total, num_word_ok, num_word_total
     
 
+def validate_model(model, loss, val_dataloader, converter):
 
-def test_model(loader):
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    model.eval()   # Set model to evaluate mode
+    running_loss = 0.
 
-    #char_error_rate = num_char_err / num_char_total
-    #word_accuracy = num_word_ok / num_word_total
-    #print('Character error rate: %f%%. Word accuracy: %f%%.' % (char_error_rate*100.0, word_accuracy*100.0))
-    #return char_error_rate
+    # character/word recognition params
+    char_err = 0 
+    char_total = 0 
+    word_ok = 0 
+    word_total = 0
 
-    pass
+        # Iterate over data.
+    for inputs, texts in tqdm(val_dataloader):
+                
+        # in case of color image permute dimensions (0 - batch, 3 - colors)
+        #inputs = inputs.permute(0, 3, 1, 2).float().to(device) 
+
+        # load images and gt_texts
+        inputs = inputs.float().to(device)
+
+        # convert text for CTC Loss input (label - encoded texts, lenghts - lenghts of encoded labels)
+        labels, lenghts = converter.encode_text(texts)
+        labels = labels.to(device)
+                
+        batch_size = inputs.size(0)
+
+        preds = model(inputs)
+        preds_size = torch.LongTensor([preds.size(0)] * batch_size)
+        loss_value = loss(preds, labels, preds_size, lenghts) / batch_size 
+
+        batch_char_err, batch_char_total, batch_word_ok, batch_word_total = check_accuracy(preds, texts, converter, silent=False)
+                        
+        char_err += batch_char_err
+        char_total += batch_char_total
+        word_ok += batch_word_ok
+        word_total += batch_word_total
+
+        running_loss += loss_value.item()
+                
+
+    val_loss = running_loss / len(val_dataloader)
+
+    char_error_rate = char_err / char_total
+    word_accuracy = word_ok / word_total
+
+    print('Character error rate: %f%%. Word accuracy: %f%%.' % (char_error_rate*100.0, word_accuracy*100.0))
+
+
+    return val_loss, char_error_rate, word_accuracy
+
+def recognize(model, image, converter):
+    " recognize input image to text "
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model.eval()
+    image = torch.Tensor(image).to(device)
+    image = image.unsqueeze(0) #add batch dimension
+    
+    pred = model(image)
+
+    # permute dimensions to batch * seq_len * charset lenght
+    pred = pred.permute(1, 0, 2)
+    
+    # decode NN output to characters
+    recognized = converter.decode_text(pred.data.cpu().numpy())
+
+    return recognized
 
 def main():
     """ main function """
-    
+    # define some command line arguments
+    parser = argparse.ArgumentParser(description = 'Todo Bicig handwritten text recognition')
+    parser.add_argument('--train', action='store_true', help='train the NN')
+    parser.add_argument('--validate', action='store_true', help='validate the NN')
 
-    dataset = TodoDataset('DATASET', (32, 192))
+    args = parser.parse_args()
 
-    train_size = int(0.8 * len(dataset))
-    val_size = len(dataset) - train_size
-
-    train_loss = [] 
-    val_loss = [] 
-    char_error = [] 
-    word_acc = []
-
-    #val_size = len(dataset) - train_size
-
-    train_set, val_set = random_split(dataset, [train_size, val_size])
-    train_dataloader = DataLoader(train_set, batch_size=32, shuffle=True, num_workers=10)
-    val_dataloader = DataLoader(val_set, batch_size=32, shuffle=True, num_workers=10)
-
-    model = Model(1024, len(dataset.char_set) + 1)
-    loss = torch.nn.CTCLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1.0e-4, amsgrad=True)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
-
+    dataset = TodoDataset(Params.dataset_path, Params.image_size)
     converter = LabelConverter(dataset.char_set)
+    
+    if args.train or args.validate:
 
-    train_loss, val_loss, char_error, word_acc = train_model(model=model, loss=loss, optimizer=optimizer, scheduler=scheduler, num_epochs=70, 
+        train_loss = [] 
+        val_loss = [] 
+        char_error = [] 
+        word_acc = []
+        
+        if args.train:
+
+            # split on train and validation sets
+            train_size = int(0.8 * len(dataset))
+            val_size = len(dataset) - train_size
+
+            train_set, val_set = random_split(dataset, [train_size, val_size])
+            train_dataloader = DataLoader(train_set, batch_size=32, shuffle=True, num_workers=10)
+            val_dataloader = DataLoader(val_set, batch_size=32, shuffle=True, num_workers=10)
+
+            # training model
+            model = Model(1024, len(dataset.char_set) + 1)
+            loss = torch.nn.CTCLoss()
+            optimizer = torch.optim.Adam(model.parameters(), lr=1.0e-4, amsgrad=True)
+            scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
+
+            train_loss, val_loss, char_error, word_acc = train_model(model=model, loss=loss, optimizer=optimizer, scheduler=scheduler, num_epochs=70, 
                 train_dataloader=train_dataloader, val_dataloader=val_dataloader, converter=converter)
 
-    torch.save(model.state_dict(), 'model/model.pth')
-    
-    return train_loss, val_loss, char_error, word_acc
+            torch.save(model.state_dict(), 'model/model.pth')
+        
+        if args.validate:
+            
+            # use all dataset
+            val_dataloader = DataLoader(dataset, batch_size=32, shuffle=True, num_workers=10)
+            loss = torch.nn.CTCLoss()
+            
+            model = Model(1024, len(dataset.char_set) + 1)
+            model.load_state_dict(torch.load('model/model.pth', map_location='cpu'))
+
+            val_loss, char_error_rate, word_accuracy = validate_model(model, loss, val_dataloader, converter)
+
+
+    else:
+        model = Model(1024, len(dataset.char_set) + 1)
+        model.load_state_dict(torch.load('model/model.pth', map_location='cpu'))
+
+        image = ImagePreprocess().resize_image(cv.imread(Params.test_image, cv.IMREAD_GRAYSCALE), Params.image_size)
+        result = recognize(model, image, converter)
+
+        print(result)
+
 
 if __name__ == '__main__':
     main()
